@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Kartenschach — Zufallskarten</title>
+<meta name="theme-color" content="#1b140f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kartenschach">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;900&family=Cinzel+Decorative:wght@700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#0f0b08;
+    --bg-panel:#1b140f;
+    --bg-panel-2:#241a13;
+    --wood-dark:#2b1d14;
+    --wood-mid:#4a3524;
+    --wood-line: rgba(201,162,75,0.18);
+    --ivory:#ece2cf;
+    --parchment:#f1e7d3;
+    --parchment-shadow:#d9c9a6;
+    --ink:#2a2016;
+    --gold:#c9a24b;
+    --gold-bright:#eccd82;
+    --gold-dim: rgba(201,162,75,0.45);
+    --common:#9aa3ab;
+    --rare:#5f8fc4;
+    --epic:#a33b46;
+    --epic-bright:#d85868;
+    --radius: 14px;
+    --shadow-deep: 0 20px 50px rgba(0,0,0,0.55);
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    max-width:100%;
+    overflow-x:hidden;
+    background:
+      radial-gradient(ellipse at 50% -10%, #241a12 0%, var(--bg-deep) 55%),
+      var(--bg-deep);
+    color:var(--ivory);
+    font-family:'Crimson Text', serif;
+    -webkit-font-smoothing:antialiased;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+  }
+  html::-webkit-scrollbar, body::-webkit-scrollbar{ display:none; width:0; height:0; }
+
+  /* subtle checkerboard texture in the background */
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(45deg, rgba(255,255,255,0.015) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.015) 75%),
+      linear-gradient(45deg, rgba(255,255,255,0.015) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.015) 75%);
+    background-size:64px 64px;
+    background-position:0 0, 32px 32px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .page{
+    position:relative; z-index:1;
+    max-width:1120px;
+    margin:0 auto;
+    padding:40px 24px 80px;
+  }
+
+  /* ---------- HEADER ---------- */
+  header{
+    text-align:center;
+    margin-bottom:38px;
+  }
+
+  .crown-row{
+    font-size:1.4rem;
+    letter-spacing:0.5em;
+    color:var(--gold-dim);
+    margin-bottom:6px;
+  }
+
+  h1{
+    font-family:'Cinzel Decorative', serif;
+    font-weight:900;
+    font-size:clamp(1.55rem, 8.2vw, 3.4rem);
+    margin:0;
+    letter-spacing:0.02em;
+    white-space:nowrap;
+    background:linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 55%, #8a6a2c 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    text-shadow:0 2px 0 rgba(0,0,0,0.4);
+  }
+
+  .subtitle{
+    font-family:'Cinzel', serif;
+    font-size:0.95rem;
+    letter-spacing:0.12em;
+    color:#b8ac95;
+    margin-top:10px;
+    text-transform:uppercase;
+  }
+
+  .rule-hairline{
+    width:220px;
+    height:2px;
+    margin:20px auto 0;
+    background:linear-gradient(90deg, transparent, var(--gold), transparent);
+    opacity:0.8;
+  }
+
+  /* ---------- TOOLBAR ---------- */
+  .toolbar-row{
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    flex-wrap:wrap;
+    margin:0 0 26px;
+  }
+  .toolbar-btn{
+    font-family:'Cinzel', serif;
+    font-size:0.78rem;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    background:var(--bg-panel);
+    color:#c9bda0;
+    border:1px solid var(--wood-line);
+    border-radius:999px;
+    padding:9px 20px;
+    cursor:pointer;
+    transition:border-color 0.15s ease, color 0.15s ease;
+  }
+  .toolbar-btn:hover{ border-color:var(--gold); color:var(--gold-bright); }
+
+  /* ---------- MODALS ---------- */
+  .modal-backdrop{
+    display:none;
+    position:fixed; inset:0;
+    background:rgba(8,5,3,0.78);
+    z-index:100;
+    align-items:flex-start;
+    justify-content:center;
+    padding:5vh 16px;
+    overflow-y:auto;
+  }
+  .modal-backdrop.open{ display:flex; }
+
+  .modal-panel{
+    background:var(--bg-panel);
+    border:1px solid var(--gold-dim);
+    border-radius:16px;
+    width:100%;
+    max-width:640px;
+    max-height:90vh;
+    overflow-y:auto;
+    padding:26px 24px 28px;
+    box-shadow:var(--shadow-deep);
+    position:relative;
+  }
+
+  .modal-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:18px;
+    gap:12px;
+  }
+  .modal-header h2{
+    font-family:'Cinzel', serif;
+    font-size:1.2rem;
+    color:var(--gold-bright);
+    margin:0;
+    letter-spacing:0.05em;
+  }
+  .modal-close{
+    background:none;
+    border:1px solid var(--wood-line);
+    color:#c9bda0;
+    width:32px; height:32px;
+    border-radius:50%;
+    cursor:pointer;
+    font-size:1rem;
+    flex-shrink:0;
+    transition:border-color 0.15s ease, color 0.15s ease;
+  }
+  .modal-close:hover{ border-color:var(--gold); color:var(--gold-bright); }
+
+  .compendium-search{
+    width:100%;
+    background:var(--bg-deep);
+    border:1px solid var(--wood-line);
+    color:var(--ivory);
+    font-family:'Crimson Text', serif;
+    font-size:1rem;
+    padding:11px 14px;
+    border-radius:9px;
+    margin-bottom:16px;
+  }
+  .compendium-search:focus{ outline:none; border-color:var(--gold-dim); }
+
+  .compendium-list{ display:flex; flex-direction:column; gap:10px; }
+  .compendium-empty{ color:#726650; font-style:italic; padding:10px 2px; }
+
+  .settings-block{ margin-bottom:26px; }
+  .settings-block:last-child{ margin-bottom:0; }
+  .settings-block h3{
+    font-family:'Cinzel', serif;
+    font-size:0.9rem;
+    color:var(--gold-bright);
+    letter-spacing:0.05em;
+    margin:0 0 12px;
+  }
+
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px solid var(--wood-line);
+  }
+  .toggle-row:last-child{ border-bottom:none; }
+  .toggle-label{ font-size:0.98rem; color:var(--ivory); }
+
+  .switch{
+    position:relative;
+    width:46px; height:26px;
+    flex-shrink:0;
+  }
+  .switch input{ opacity:0; width:0; height:0; }
+  .switch-track{
+    position:absolute; inset:0;
+    background:var(--wood-dark);
+    border:1px solid var(--wood-line);
+    border-radius:999px;
+    cursor:pointer;
+    transition:background 0.2s ease;
+  }
+  .switch-track::before{
+    content:"";
+    position:absolute;
+    width:18px; height:18px;
+    left:3px; top:2.5px;
+    background:#c9bda0;
+    border-radius:50%;
+    transition:transform 0.2s ease, background 0.2s ease;
+  }
+  .switch input:checked + .switch-track{ background:rgba(201,162,75,0.3); border-color:var(--gold); }
+  .switch input:checked + .switch-track::before{ transform:translateX(20px); background:var(--gold-bright); }
+
+  .ban-count{
+    font-size:0.85rem;
+    color:#8f8471;
+    margin-bottom:12px;
+  }
+  .ban-list{
+    max-height:280px;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    border:1px solid var(--wood-line);
+    border-radius:9px;
+    padding:6px 4px;
+  }
+  .ban-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 10px;
+    border-radius:6px;
+  }
+  .ban-row:hover{ background:rgba(201,162,75,0.05); }
+  .ban-row input{ flex-shrink:0; width:16px; height:16px; accent-color:var(--gold); }
+  .ban-row label{ flex:1; font-size:0.92rem; color:var(--ivory); cursor:pointer; }
+
+  .btn-danger{
+    font-family:'Cinzel', serif;
+    font-size:0.82rem;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    background:transparent;
+    color:var(--epic-bright);
+    border:1px solid var(--epic-bright);
+    border-radius:8px;
+    padding:11px 18px;
+    cursor:pointer;
+    width:100%;
+    transition:background 0.15s ease, color 0.15s ease;
+  }
+  .btn-danger:hover{ background:var(--epic-bright); color:#1b0e0f; }
+
+  /* ---------- STATS ---------- */
+  .stats-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:16px;
+  }
+  @media (min-width:640px){ .stats-grid{ grid-template-columns:1fr 1fr; } }
+
+  .stats-card{
+    background:var(--bg-panel);
+    border:1px solid var(--wood-line);
+    border-radius:12px;
+    padding:16px 18px;
+  }
+  .stats-name{
+    font-family:'Cinzel', serif;
+    font-size:0.95rem;
+    color:var(--gold-bright);
+    margin-bottom:12px;
+  }
+  .stats-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:8px;
+    font-size:0.82rem;
+  }
+  .stats-row:last-child{ margin-bottom:0; }
+  .stats-row .stats-label{ width:60px; flex-shrink:0; color:#a89a80; }
+  .stats-bar-track{
+    flex:1;
+    height:10px;
+    background:var(--bg-deep);
+    border-radius:999px;
+    overflow:hidden;
+  }
+  .stats-bar-fill{ height:100%; border-radius:999px; transition:width 0.4s ease; }
+  .stats-row .stats-num{ width:22px; text-align:right; color:#d8cbae; flex-shrink:0; }
+
+  /* ---------- CONFIRM ROW ---------- */
+  .confirm-row{
+    display:flex;
+    gap:8px;
+    padding:12px 14px 14px;
+  }
+  .btn-confirm-yes, .btn-confirm-no{
+    flex:1;
+    font-family:'Cinzel', serif;
+    font-size:0.72rem;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    padding:9px 8px;
+    border-radius:7px;
+    cursor:pointer;
+  }
+  .btn-confirm-yes{
+    background:var(--gold);
+    color:#241a12;
+    border:1px solid var(--gold);
+  }
+  .btn-confirm-yes:hover{ filter:brightness(1.1); }
+  .btn-confirm-no{
+    background:transparent;
+    color:#a89a80;
+    border:1px solid var(--wood-line);
+  }
+  .btn-confirm-no:hover{ border-color:var(--gold-dim); color:var(--gold-bright); }
+
+  /* ---------- TOAST ---------- */
+  .toast{
+    position:fixed;
+    bottom:26px; left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--wood-dark);
+    border:1px solid var(--gold);
+    color:var(--ivory);
+    font-family:'Cinzel', serif;
+    font-size:0.85rem;
+    padding:12px 22px;
+    border-radius:999px;
+    box-shadow:var(--shadow-deep);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.25s ease, transform 0.25s ease;
+    z-index:200;
+  }
+  .toast.visible{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ---------- PLAYERS ---------- */
+  .players-row{
+    display:flex;
+    justify-content:center;
+    align-items:stretch;
+    gap:18px;
+    flex-wrap:wrap;
+    margin:0 0 30px;
+  }
+
+  .player-badge{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--bg-panel);
+    border:1.5px solid var(--wood-line);
+    border-radius:12px;
+    padding:10px 16px;
+    min-width:180px;
+    transition:border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .player-badge.active{
+    border-color:var(--gold);
+    box-shadow:0 0 0 1px var(--gold-dim), 0 8px 20px rgba(0,0,0,0.4);
+  }
+
+  .player-glyph{
+    font-size:1.3rem;
+    color:var(--gold-dim);
+    flex-shrink:0;
+  }
+  .player-badge.active .player-glyph{ color:var(--gold-bright); }
+
+  .player-info{ flex:1; min-width:0; }
+  .player-label{
+    font-family:'Cinzel', serif;
+    font-size:0.62rem;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:#8f8471;
+  }
+  .player-name{
+    font-family:'Cinzel', serif;
+    font-size:0.98rem;
+    color:var(--ivory);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .player-badge.active .player-name{ color:var(--gold-bright); }
+
+  .player-name-input{
+    font-family:'Cinzel', serif;
+    font-size:0.98rem;
+    background:var(--bg-deep);
+    color:var(--ivory);
+    border:1px solid var(--gold-dim);
+    border-radius:6px;
+    padding:3px 8px;
+    width:100%;
+  }
+
+  .player-edit-btn{
+    background:none;
+    border:none;
+    color:#8f8471;
+    cursor:pointer;
+    font-size:0.95rem;
+    padding:4px;
+    flex-shrink:0;
+    transition:color 0.15s ease, transform 0.15s ease;
+  }
+  .player-edit-btn:hover{ color:var(--gold-bright); transform:scale(1.15); }
+
+  .turn-banner{
+    text-align:center;
+    margin:0 0 22px;
+    font-family:'Cinzel', serif;
+    font-size:1.05rem;
+    letter-spacing:0.05em;
+    color:var(--gold-bright);
+    display:none;
+  }
+  .turn-banner .label{
+    color:#8f8471;
+    font-size:0.7rem;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    display:block;
+    margin-bottom:4px;
+  }
+  .turn-banner.visible{ display:block; }
+
+  /* ---------- DRAW BUTTON ---------- */
+  .draw-zone{
+    display:flex;
+    justify-content:center;
+    margin:34px 0 46px;
+  }
+
+  .draw-btn{
+    font-family:'Cinzel', serif;
+    font-weight:600;
+    font-size:1.05rem;
+    letter-spacing:0.08em;
+    color:var(--ivory);
+    background:linear-gradient(180deg, var(--wood-mid), var(--wood-dark));
+    border:1px solid var(--gold-dim);
+    border-radius:999px;
+    padding:16px 40px;
+    cursor:pointer;
+    position:relative;
+    box-shadow:0 10px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+    transition:transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    display:flex; align-items:center; gap:12px;
+  }
+  .draw-btn::before{ content:"♞"; font-size:1.3rem; color:var(--gold-bright); }
+  .draw-btn:hover{ transform:translateY(-2px); filter:brightness(1.12); box-shadow:0 14px 30px rgba(0,0,0,0.55); }
+  .draw-btn:active{ transform:translateY(0); }
+  .draw-btn:disabled{ opacity:0.4; cursor:not-allowed; transform:none; }
+
+  .draw-hint{
+    text-align:center;
+    color:#8f8471;
+    font-size:0.92rem;
+    margin-top:-30px;
+    margin-bottom:40px;
+    font-style:italic;
+    min-height:1.4em;
+  }
+
+  /* ---------- CARD DUEL AREA ---------- */
+  .duel{
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    gap:28px;
+    padding:4px 4px 14px;
+    min-height:420px;
+  }
+
+  .empty-state{
+    text-align:center;
+    color:#8f8471;
+    font-family:'Cinzel', serif;
+    letter-spacing:0.08em;
+    font-size:0.95rem;
+    padding:80px 20px;
+    width:100%;
+  }
+  .empty-state span{ display:block; font-size:2.4rem; margin-bottom:14px; color:var(--gold-dim); }
+
+  .card-slot{
+    perspective:1600px;
+    width:100%;
+    max-width:400px;
+  }
+
+  .card-slot.discarding{
+    animation: discardOut 0.55s ease forwards;
+  }
+  @keyframes discardOut{
+    to{ transform:translateY(40px) scale(0.85) rotate(-6deg); opacity:0; }
+  }
+
+  .card{
+    position:relative;
+    width:100%;
+    height:410px;
+    transform-style:preserve-3d;
+    transition:transform 0.7s cubic-bezier(.4,.2,.2,1);
+    animation: dealIn 0.5s ease both;
+  }
+  @keyframes dealIn{
+    from{ opacity:0; transform:translateY(-30px) rotate(-4deg) scale(0.9); }
+    to{ opacity:1; transform:translateY(0) rotate(0) scale(1); }
+  }
+
+  .card.flipped .card-inner{ transform:rotateY(180deg); }
+
+  .card-inner{
+    position:absolute; inset:0;
+    transform-style:preserve-3d;
+    transition:transform 0.7s cubic-bezier(.4,.2,.2,1);
+  }
+
+  .card-face{
+    position:absolute; inset:0;
+    -webkit-backface-visibility:hidden;
+    backface-visibility:hidden;
+    border-radius:var(--radius);
+    box-shadow:var(--shadow-deep);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    border:2px solid var(--wood-dark);
+  }
+
+  /* ---- FRONT ---- */
+  .card-front{
+    background:
+      radial-gradient(circle at 50% 0%, rgba(255,255,255,0.06), transparent 60%),
+      var(--parchment);
+    color:var(--ink);
+  }
+
+  .card-frame{
+    position:absolute; inset:8px;
+    border:1.5px solid var(--gold-dim);
+    border-radius:9px;
+    pointer-events:none;
+  }
+  .card-frame::before,.card-frame::after,
+  .card-frame span::before, .card-frame span::after{
+    content:"";
+    position:absolute;
+    width:16px; height:16px;
+    border:2px solid var(--gold);
+  }
+  .card-frame::before{ top:-2px; left:-2px; border-right:none; border-bottom:none; }
+  .card-frame::after{ top:-2px; right:-2px; border-left:none; border-bottom:none; }
+  .card-frame span::before{ bottom:-2px; left:-2px; border-right:none; border-top:none; }
+  .card-frame span::after{ bottom:-2px; right:-2px; border-left:none; border-top:none; }
+
+  .card-rarity{
+    position:absolute;
+    top:14px; left:50%;
+    transform:translateX(-50%);
+    font-family:'Cinzel', serif;
+    font-size:0.6rem;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    padding:3px 10px 3px 8px;
+    border-radius:999px;
+    display:flex; align-items:center; gap:5px;
+    color:#fff;
+    white-space:nowrap;
+  }
+  .card-rarity .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; box-shadow:0 0 6px currentColor; }
+  .card-rarity.common{ background:rgba(154,163,171,0.18); color:var(--common); border:1px solid var(--common); }
+  .card-rarity.rare{ background:rgba(95,143,196,0.18); color:var(--rare); border:1px solid var(--rare); }
+  .card-rarity.epic{ background:rgba(163,59,70,0.2); color:var(--epic-bright); border:1px solid var(--epic-bright); }
+
+  .card-seal{
+    width:58px; height:58px;
+    margin:40px auto 10px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 35% 30%, #fbf3e0, var(--parchment-shadow));
+    border:2px solid var(--gold);
+    box-shadow:0 0 0 3px rgba(201,162,75,0.18), 0 3px 6px rgba(0,0,0,0.25);
+    flex-shrink:0;
+  }
+  .card-seal .letter{
+    font-family:'Cinzel Decorative', serif;
+    font-weight:700;
+    font-size:1.5rem;
+    color:var(--wood-dark);
+  }
+
+  .card-name{
+    font-family:'Cinzel', serif;
+    font-weight:700;
+    font-size:1.05rem;
+    text-align:center;
+    padding:0 20px;
+    margin-top:2px;
+    letter-spacing:0.02em;
+    line-height:1.25;
+    flex-shrink:0;
+  }
+
+  .card-divider{
+    width:60px; height:2px;
+    margin:12px auto;
+    background:linear-gradient(90deg, transparent, var(--gold), transparent);
+    flex-shrink:0;
+  }
+
+  .card-short{
+    font-size:0.88rem;
+    text-align:center;
+    padding:0 20px;
+    color:#463a29;
+    line-height:1.42;
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .card-short::-webkit-scrollbar{ width:4px; }
+  .card-short::-webkit-scrollbar-thumb{ background:var(--gold-dim); border-radius:3px; }
+
+  .card-actions{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 14px 14px;
+    flex-shrink:0;
+  }
+
+  .btn-choose{
+    font-family:'Cinzel', serif;
+    font-size:0.78rem;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    background:linear-gradient(180deg, var(--wood-mid), var(--wood-dark));
+    color:var(--ivory);
+    border:1px solid var(--gold-dim);
+    border-radius:8px;
+    padding:9px 16px;
+    cursor:pointer;
+    transition:filter 0.15s ease, transform 0.15s ease;
+  }
+  .btn-choose:hover{ filter:brightness(1.2); transform:translateY(-1px); }
+
+  .btn-info{
+    width:34px; height:34px;
+    border-radius:50%;
+    border:1.5px solid var(--gold);
+    background:var(--parchment);
+    color:var(--gold);
+    font-family:'Cinzel', serif;
+    font-weight:700;
+    font-style:italic;
+    font-size:0.95rem;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  }
+  .btn-info:hover{ background:var(--gold); color:#2a2016; transform:scale(1.08); }
+
+  /* ---- BACK ---- */
+  .card-back{
+    background:
+      radial-gradient(circle at 50% 0%, rgba(255,255,255,0.03), transparent 60%),
+      var(--wood-dark);
+    color:var(--parchment);
+    transform:rotateY(180deg);
+    padding:20px 18px 16px;
+    justify-content:space-between;
+  }
+
+  .card-back .back-header{
+    text-align:center;
+    margin-bottom:10px;
+  }
+  .card-back .back-title{
+    font-family:'Cinzel', serif;
+    font-weight:700;
+    font-size:1rem;
+    color:var(--gold-bright);
+    letter-spacing:0.03em;
+  }
+  .card-back .back-divider{
+    width:50px; height:1.5px;
+    margin:8px auto 0;
+    background:linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  .back-rule-label{
+    font-family:'Cinzel', serif;
+    font-size:0.66rem;
+    letter-spacing:0.15em;
+    text-transform:uppercase;
+    color:var(--gold-dim);
+    margin-bottom:6px;
+  }
+
+  .back-text{
+    font-size:0.94rem;
+    line-height:1.5;
+    color:#e8dcc4;
+    overflow-y:auto;
+    flex:1;
+    padding-right:4px;
+  }
+  .back-text::-webkit-scrollbar{ width:5px; }
+  .back-text::-webkit-scrollbar-thumb{ background:var(--gold-dim); border-radius:3px; }
+
+  .card-back .card-actions{ padding:12px 0 0; border-top:1px solid var(--wood-line); margin-top:10px; }
+  .card-back .btn-info{ background:transparent; }
+  .card-back .btn-info:hover{ background:var(--gold); }
+
+  /* ---------- HAND ---------- */
+  .hand-section{
+    margin-top:56px;
+  }
+
+  .hand-heading{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:18px;
+  }
+  .hand-heading h2{
+    font-family:'Cinzel', serif;
+    font-size:1.25rem;
+    letter-spacing:0.08em;
+    color:var(--gold-bright);
+    margin:0;
+    white-space:nowrap;
+  }
+  .hand-heading .line{ flex:1; height:1px; background:linear-gradient(90deg, var(--gold-dim), transparent); }
+  .hand-count{
+    font-family:'Cinzel', serif;
+    font-size:0.78rem;
+    color:#8f8471;
+  }
+
+  .hand-empty{
+    color:#726650;
+    font-style:italic;
+    font-size:0.95rem;
+    padding:18px 4px;
+  }
+
+  .hand-note{
+    font-size:0.85rem;
+    color:#7d7259;
+    font-style:italic;
+    margin:-8px 0 18px;
+  }
+
+  .skip-zone{
+    display:flex;
+    justify-content:center;
+    margin:26px 0 44px;
+  }
+
+  .btn-skip{
+    font-family:'Cinzel', serif;
+    font-size:0.82rem;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    background:var(--bg-panel);
+    color:#c9bda0;
+    border:1px solid var(--wood-line);
+    border-radius:999px;
+    padding:12px 26px;
+    cursor:pointer;
+    box-shadow:0 6px 16px rgba(0,0,0,0.35);
+    transition:border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  }
+  .btn-skip:hover{ border-color:var(--gold); color:var(--gold-bright); transform:translateY(-1px); }
+
+  .hand-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
+    gap:14px;
+  }
+
+  details.hand-card{
+    background:var(--bg-panel);
+    border:1px solid var(--wood-line);
+    border-left:3px solid var(--gold);
+    border-radius:10px;
+    padding:0;
+    overflow:hidden;
+  }
+  details.hand-card[open]{ border-color:var(--gold-dim); }
+
+  details.hand-card summary{
+    list-style:none;
+    cursor:pointer;
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  details.hand-card summary::-webkit-details-marker{ display:none; }
+
+  .hand-icon{
+    width:30px; height:30px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 35% 30%, #fbf3e0, var(--parchment-shadow));
+    border:1.5px solid var(--gold);
+    font-family:'Cinzel Decorative', serif;
+    font-weight:700;
+    font-size:0.85rem;
+    color:var(--wood-dark);
+    flex-shrink:0;
+  }
+  .hand-summary-text{ flex:1; min-width:0; }
+  .hand-name{
+    font-family:'Cinzel', serif;
+    font-size:0.95rem;
+    color:var(--ivory);
+    display:flex; align-items:center; gap:8px;
+  }
+  .hand-short{
+    font-size:0.84rem;
+    color:#a89a80;
+    margin-top:2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .hand-caret{
+    color:var(--gold-dim);
+    transition:transform 0.2s ease;
+    flex-shrink:0;
+  }
+  details.hand-card[open] .hand-caret{ transform:rotate(90deg); }
+
+  .hand-detail{
+    padding:0 16px 16px 48px;
+    font-size:0.92rem;
+    line-height:1.5;
+    color:#d8cbae;
+  }
+  .hand-detail .discard-btn{
+    margin-top:12px;
+    background:none;
+    border:1px solid var(--epic-bright);
+    color:var(--epic-bright);
+    font-family:'Cinzel', serif;
+    font-size:0.72rem;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    padding:7px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background 0.15s ease, color 0.15s ease;
+  }
+  .hand-detail .discard-btn:hover{ background:var(--epic-bright); color:#1b0e0f; }
+
+  .mini-dot{ width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .mini-dot.common{ background:var(--common); }
+  .mini-dot.rare{ background:var(--rare); }
+  .mini-dot.epic{ background:var(--epic-bright); }
+
+  /* ---------- TURN LOG TABLE ---------- */
+  .log-section{ margin-top:56px; }
+
+  .log-table-wrap{
+    background:var(--bg-panel);
+    border:1px solid var(--wood-line);
+    border-radius:12px;
+    overflow:hidden;
+  }
+
+  table.log-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:0.9rem;
+  }
+
+  .log-table thead th{
+    font-family:'Cinzel', serif;
+    font-size:0.68rem;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--gold-dim);
+    text-align:left;
+    padding:12px 16px;
+    border-bottom:1px solid var(--wood-line);
+    background:var(--bg-panel-2);
+  }
+
+  .log-table td{
+    padding:11px 16px;
+    border-bottom:1px solid var(--wood-line);
+    color:#d8cbae;
+    vertical-align:middle;
+  }
+  .log-table tr:last-child td{ border-bottom:none; }
+  .log-table tr:hover td{ background:rgba(201,162,75,0.05); }
+
+  .log-turn-num{
+    font-family:'Cinzel', serif;
+    color:var(--gold-dim);
+    width:48px;
+  }
+
+  .log-player{
+    font-family:'Cinzel', serif;
+    font-size:0.85rem;
+    color:var(--ivory);
+    white-space:nowrap;
+  }
+
+  .log-action{ display:flex; align-items:center; gap:8px; }
+  .log-action .mini-dot{ flex-shrink:0; }
+  .log-skip{
+    color:#8f8471;
+    font-style:italic;
+  }
+
+  .log-empty{
+    padding:20px 16px;
+    color:#726650;
+    font-style:italic;
+    font-size:0.92rem;
+  }
+
+  @media (max-width: 520px){
+    .log-table thead{ display:none; }
+    .log-table, .log-table tbody, .log-table tr, .log-table td{ display:block; width:100%; }
+    .log-table tr{ padding:10px 16px; border-bottom:1px solid var(--wood-line); }
+    .log-table td{ border:none; padding:2px 0; }
+    .log-turn-num::before{ content:"Zug "; color:#726650; }
+    .log-player::before{ content:"Spieler: "; color:#726650; font-family:'Crimson Text', serif; font-size:0.8rem; }
+  }
+
+  /* ---------- LEGEND ---------- */
+  .legend{
+    margin-top:60px;
+    display:flex;
+    justify-content:center;
+    gap:28px;
+    flex-wrap:wrap;
+    font-size:0.82rem;
+    color:#8f8471;
+    font-family:'Cinzel', serif;
+    letter-spacing:0.04em;
+  }
+  .legend .item{ display:flex; align-items:center; gap:8px; }
+  .legend .swatch{ width:10px; height:10px; border-radius:50%; }
+
+  footer.note{
+    text-align:center;
+    margin-top:26px;
+    color:#5f543f;
+    font-size:0.8rem;
+    font-style:italic;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .card-inner, .card, .card-slot.discarding, .draw-btn, .btn-choose, .btn-info{
+      transition:none !important;
+      animation:none !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="crown-row">♔ ♛ ♜</div>
+    <h1>Kartenschach</h1>
+    <div class="subtitle">Zufallskarten für deine Schachpartie</div>
+    <div class="rule-hairline"></div>
+  </header>
+
+  <div class="toolbar-row">
+    <button class="toolbar-btn" id="compendiumBtn">Kompendium</button>
+    <button class="toolbar-btn" id="settingsBtn">Einstellungen</button>
+  </div>
+
+  <div class="players-row">
+    <div class="player-badge" id="badge-p1">
+      <span class="player-glyph">♔</span>
+      <div class="player-info">
+        <div class="player-label">Spieler 1</div>
+        <div class="player-name" id="name-p1">Spieler 1</div>
+      </div>
+      <button class="player-edit-btn" title="Namen bearbeiten" onclick="editPlayer('p1')">✎</button>
+    </div>
+    <div class="player-badge" id="badge-p2">
+      <span class="player-glyph">♚</span>
+      <div class="player-info">
+        <div class="player-label">Spieler 2</div>
+        <div class="player-name" id="name-p2">Spieler 2</div>
+      </div>
+      <button class="player-edit-btn" title="Namen bearbeiten" onclick="editPlayer('p2')">✎</button>
+    </div>
+  </div>
+
+  <div class="draw-zone">
+    <button class="draw-btn" id="drawBtn">Zwei Karten ziehen</button>
+  </div>
+  <div class="draw-hint" id="drawHint">Ziehe zwei Karten und wähle eine für deine Hand.</div>
+
+  <div class="turn-banner" id="turnBanner">
+    <span class="label">Am Zug — wählt die Karte aus</span>
+    <span id="turnBannerName"></span>
+  </div>
+
+  <div class="duel" id="duel">
+    <div class="empty-state">
+      <span>♟</span>
+      Noch keine Karten gezogen — drück oben auf den Knopf.
+    </div>
+  </div>
+
+  <div class="skip-zone" id="skipZone" style="display:none">
+    <button class="btn-skip" id="skipBtn">Keine der beiden passt — normal ziehen</button>
+  </div>
+
+  <div class="hand-section">
+    <div class="hand-heading">
+      <h2>Gespielte Karten</h2>
+      <div class="line"></div>
+      <div class="hand-count" id="handCount">0 Karten</div>
+    </div>
+    <div class="hand-note">Zum Nachlesen der genauen Regel. Eine gespielte Karte gilt sofort und wird nicht wiederverwendet.</div>
+    <div id="handArea">
+      <div class="hand-empty">Noch keine Karte gespielt.</div>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <div class="hand-heading">
+      <h2>Zug-Verlauf</h2>
+      <div class="line"></div>
+    </div>
+    <div class="log-table-wrap">
+      <table class="log-table">
+        <thead>
+          <tr>
+            <th>Zug</th>
+            <th>Spieler</th>
+            <th>Aktion</th>
+          </tr>
+        </thead>
+        <tbody id="logTableBody"></tbody>
+      </table>
+      <div class="log-empty" id="logEmpty">Noch kein Zug gespielt.</div>
+    </div>
+    <div style="text-align:right; margin-top:10px;">
+      <button class="toolbar-btn" id="copyLogBtn">Verlauf kopieren</button>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <div class="hand-heading">
+      <h2>Statistik</h2>
+      <div class="line"></div>
+    </div>
+    <div class="stats-grid" id="statsGrid"></div>
+  </div>
+
+  <div class="legend">
+    <div class="item"><span class="swatch" style="background:var(--common)"></span>Häufig</div>
+    <div class="item"><span class="swatch" style="background:var(--rare)"></span>Selten</div>
+    <div class="item"><span class="swatch" style="background:var(--epic-bright)"></span>Episch</div>
+  </div>
+
+  <footer class="note">Klick auf das „i" um die genaue Regel zu lesen, bevor du dich entscheidest.</footer>
+
+</div>
+
+<!-- KOMPENDIUM MODAL -->
+<div class="modal-backdrop" id="compendiumModal">
+  <div class="modal-panel">
+    <div class="modal-header">
+      <h2>Kartenkompendium</h2>
+      <button class="modal-close" id="compendiumClose">✕</button>
+    </div>
+    <input type="text" class="compendium-search" id="compendiumSearch" placeholder="Karte suchen…">
+    <div class="compendium-list" id="compendiumList"></div>
+  </div>
+</div>
+
+<!-- EINSTELLUNGEN MODAL -->
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal-panel">
+    <div class="modal-header">
+      <h2>Einstellungen</h2>
+      <button class="modal-close" id="settingsClose">✕</button>
+    </div>
+
+    <div class="settings-block">
+      <h3>Feedback</h3>
+      <div class="toggle-row">
+        <span class="toggle-label">Ton beim Ziehen/Spielen</span>
+        <label class="switch">
+          <input type="checkbox" id="soundToggle">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Vibration</span>
+        <label class="switch">
+          <input type="checkbox" id="vibrationToggle">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Karten-Bann-Liste</h3>
+      <div class="ban-count" id="banCount">50 von 50 Karten aktiv</div>
+      <div class="ban-list" id="banList"></div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Spiel</h3>
+      <button class="btn-danger" id="resetBtn">Neues Spiel starten (Verlauf löschen)</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================
+   KARTEN-DATEN
+   rarity weights: common = 6, rare = 3, epic = 1
+===================================================== */
+const CARDS = [
+  {name:"Mähdrescher", icon:"🌾", rarity:"rare", short:"Eine Linienfigur schlägt alles auf ihrem Weg.", long:"Ziehe mit einer Läufer-, Turm- oder Damenfigur regulär in ihre normale Richtung. Dabei wird nicht nur die Figur auf dem Zielfeld geschlagen, sondern jede gegnerische Figur, die sich irgendwo auf der durchlaufenen Linie befindet. Die eigene Figur bleibt am Ende auf dem ursprünglich gewählten Zielfeld stehen."},
+  {name:"Doppelzug", icon:"⏩", rarity:"rare", short:"Eine Figur zieht zweimal hintereinander.", long:"Wähle eine beliebige eigene Figur außer dem König. Sie führt zwei reguläre Züge direkt hintereinander aus. Der zweite Zug darf auch ein Schlagzug sein, selbst wenn der erste Zug ebenfalls geschlagen hat. Zwischen den beiden Zügen darf sich die Stellung durch nichts anderes verändern."},
+  {name:"Geisterschritt", icon:"👻", rarity:"common", short:"Eine Figur zieht einmalig wie ein Springer.", long:"Wähle eine beliebige eigene Figur. Sie führt einmalig einen Zug exakt nach der Bewegungsregel eines Springers aus (auch wenn sie normalerweise anders zieht). Springt sie auf ein besetztes gegnerisches Feld, wird die gegnerische Figur regulär geschlagen."},
+  {name:"Rückspul", icon:"↩️", rarity:"common", short:"Eine eigene Figur springt zurück.", long:"Wähle eine eigene Figur, die in deinem letzten Zug bewegt wurde. Stelle sie zurück auf das Feld, auf dem sie vor diesem Zug stand. War das Feld zuvor durch Schlagen befreit worden, bleibt die geschlagene gegnerische Figur trotzdem entfernt."},
+  {name:"Teleporter", icon:"🌀", rarity:"epic", short:"Versetze eine Figur auf ein beliebiges freies Feld.", long:"Wähle eine eigene Figur außer dem König. Versetze sie auf ein beliebiges freies Feld deiner Wahl auf dem gesamten Brett. Dies zählt nicht als regulärer Zug im Sinne der Rochade-Bedingungen (die Figur gilt weiterhin als „nicht gezogen”, falls das für andere Karten relevant ist)."},
+  {name:"Turbo-Bauer", icon:"🚀", rarity:"common", short:"Ein Bauer zieht 3 Felder vorwärts.", long:"Wähle einen eigenen Bauern. Er zieht 3 Felder geradeaus in Bewegungsrichtung, sofern alle Felder dazwischen und das Zielfeld frei sind. Dabei kann nicht geschlagen werden. Steht ein Bauer auf seiner Startreihe, darf er trotzdem diesen 3-Felder-Zug statt des normalen Zugs nutzen."},
+  {name:"Seitensprung", icon:"↔️", rarity:"common", short:"Ein Bauer zieht 1 Feld seitwärts.", long:"Wähle einen eigenen Bauern. Er zieht einmalig 1 Feld nach links oder rechts auf ein freies Feld. Dabei kann nicht geschlagen werden, und der Zug löst kein „en passant” für den Gegner aus."},
+  {name:"Zeitverzerrung", icon:"⏳", rarity:"rare", short:"Zug aussetzen, dafür 2 Karten ziehen.", long:"Anstelle eines regulären Zugs setzt du diesen Zug komplett aus. Ziehe dafür sofort 2 neue Karten aus dem Stapel und lege danach 1 davon (deine Wahl) wieder verdeckt ab. Die andere Karte bleibt in deiner Hand."},
+  {name:"Totem der Unsterblichkeit", icon:"⚱️", rarity:"epic", short:"Belebe eine geschlagene Figur wieder.", long:"Wähle eine deiner bereits geschlagenen Figuren (beliebiger Typ außer König). Stelle sie auf ein beliebiges freies Feld innerhalb deiner ersten beiden Reihen (aus deiner Sicht). Die Figur ist ab sofort wieder regulär im Spiel."},
+  {name:"Phönixfeder", icon:"🪶", rarity:"rare", short:"Der zuletzt geschlagene eigene Bauer kehrt zurück.", long:"Der zuletzt geschlagene Bauer deiner Farbe wird auf ein freies Feld deiner Grundreihe (die hinterste Reihe aus deiner Sicht) zurückgestellt. Ist kein Feld frei oder wurde noch kein eigener Bauer geschlagen, verfällt die Karte wirkungslos."},
+  {name:"Klon", icon:"🧬", rarity:"epic", short:"Erschaffe eine Kopie einer Figur.", long:"Wähle eine eigene Figur außer König oder Dame. Erschaffe eine identische Kopie dieser Figur auf einem freien, direkt angrenzenden Feld (auch diagonal). Ist kein Nachbarfeld frei, verfällt die Karte."},
+  {name:"Beschwörung", icon:"✨", rarity:"rare", short:"Ein zusätzlicher Bauer erscheint.", long:"Ein zusätzlicher eigener Bauer erscheint auf einem freien Feld deiner zweiten Reihe (aus deiner Sicht). Ist keine Reihe mehr frei, wähle das nächstmögliche freie Feld in deiner Hälfte."},
+  {name:"Bombe", icon:"💣", rarity:"epic", short:"Zerstört alle Figuren um ein Zielfeld.", long:"Wähle ein beliebiges Feld auf dem Brett. Alle Figuren (beider Farben, Könige ausgenommen) auf den bis zu 8 direkt angrenzenden Feldern werden vom Brett entfernt. Das gewählte Zentrumsfeld selbst bleibt unverändert."},
+  {name:"Scharfschütze", icon:"🎯", rarity:"epic", short:"Entferne eine gegnerische Figur direkt.", long:"Wähle eine beliebige gegnerische Figur außer dem König. Sie wird sofort und ohne regulären Zug vom Brett entfernt — unabhängig von Reichweite, Zuglinie oder blockierenden Figuren."},
+  {name:"Domino", icon:"🁢", rarity:"rare", short:"Nach einem Schlag folgt ein zweiter Schlag.", long:"Führe mit einer beliebigen Figur einen regulären Schlagzug aus. Ist mit derselben Figur direkt im Anschluss ein weiterer regulärer Schlagzug möglich, darf dieser sofort ausgeführt werden. Ohne einen ersten Schlagzug hat die Karte keine Wirkung."},
+  {name:"Meuchelmord", icon:"🗡️", rarity:"epic", short:"Entferne eine gegnerische Figur (kein König/Dame).", long:"Wähle eine gegnerische Figur außer König oder Dame. Sie wird ohne eigenen Zug direkt vom Brett entfernt."},
+  {name:"Explosionspfeil", icon:"🏹", rarity:"rare", short:"Turmzug reißt die Nachbarfelder mit.", long:"Ziehe mit einem eigenen Turm regulär. Zusätzlich werden alle Figuren (beider Farben, außer Könige) auf den Feldern entfernt, die direkt orthogonal oder diagonal an das Zielfeld angrenzen."},
+  {name:"Schutzschild", icon:"🛡️", rarity:"common", short:"Eine Figur ist kurzzeitig unschlagbar.", long:"Wähle eine eigene Figur. In der unmittelbar folgenden gegnerischen Zugphase kann diese Figur nicht geschlagen werden — ein Zug dorthin ist für den Gegner nicht erlaubt."},
+  {name:"Spiegelfalle", icon:"🪞", rarity:"rare", short:"Wer diese Figur schlägt, wird selbst entfernt.", long:"Markiere eine eigene Figur. Schlägt der Gegner sie in seinem nächsten Zug, wird die schlagende gegnerische Figur unmittelbar danach ebenfalls vom Brett entfernt. Der König ist von diesem Effekt ausgenommen (kann also gefahrlos schlagen)."},
+  {name:"Bollwerk", icon:"🧱", rarity:"rare", short:"Alle Bauern sind kurzzeitig unschlagbar.", long:"Für die Dauer von 2 gegnerischen Zügen können alle deine Bauern nicht geschlagen werden. Andere Effekte (z. B. Bedrohung, Schach) bleiben davon unberührt."},
+  {name:"Fluchtreflex", icon:"🏃", rarity:"common", short:"Eine bedrohte Figur springt zur Seite.", long:"Wähle eine eigene Figur, die aktuell von einer gegnerischen Figur bedroht wird. Verschiebe sie sofort auf ein freies, direkt angrenzendes Feld. Dies zählt nicht als regulärer Zug."},
+  {name:"Unsichtbarkeit", icon:"🫥", rarity:"rare", short:"Eine Figur kann kurzzeitig nicht anvisiert werden.", long:"Wähle eine eigene Figur. Für den nächsten gegnerischen Zug darf sie nicht als Zielfeld eines Schlagzugs gewählt werden. Sie blockiert ihr Feld für alle anderen Zwecke weiterhin ganz normal."},
+  {name:"Verwirrung", icon:"🌀", rarity:"common", short:"Du bestimmst, mit welcher Figur der Gegner zieht.", long:"Bestimme eine beliebige gegnerische Figur. Der Gegner muss seinen nächsten Zug mit genau dieser Figur ausführen (die Zugart selbst bleibt regulär). Ist mit dieser Figur kein Zug möglich, verfällt die Karte und der Gegner zieht normal."},
+  {name:"Fesselung", icon:"⛓️", rarity:"common", short:"Eine gegnerische Figur darf nicht ziehen.", long:"Wähle eine gegnerische Figur außer dem König. Sie darf im nächsten gegnerischen Zug nicht bewegt werden. Steht der gegnerische König dadurch im Schach, hat das Vorrang — die Fesselung entfällt dann für diesen einen Zug."},
+  {name:"Tausch", icon:"🔄", rarity:"rare", short:"Zwei beliebige Figuren tauschen die Plätze.", long:"Wähle zwei beliebige Figuren auf dem Brett — unabhängig von Farbe oder Typ, auch Könige sind erlaubt. Beide tauschen sofort ihre Position. Es findet dabei kein Schlagen statt."},
+  {name:"Diebstahl", icon:"🖐️", rarity:"epic", short:"Leih dir eine gegnerische Figur für einen Zug.", long:"Wähle eine gegnerische Figur außer dem König. Du darfst mit ihr diesen Zug ausführen, als wäre sie deine eigene (inklusive Schlagen). Danach gehört die Figur wieder regulär dem Gegner."},
+  {name:"Blockade", icon:"🚧", rarity:"common", short:"Ein Feld ist kurzzeitig unpassierbar.", long:"Wähle ein freies Feld. Für die Dauer von 2 Zügen (beider Spieler) darf dieses Feld von keiner Figur betreten oder überzogen werden — auch nicht von Läufer, Turm oder Dame auf ihrer Linie."},
+  {name:"Metamorphose", icon:"🦋", rarity:"rare", short:"Eine Figur zieht kurzzeitig wie eine Dame.", long:"Wähle eine eigene Figur außer dem König. Für die nächsten 2 eigenen Züge darf sie sich wie eine Dame bewegen (behält aber ihr ursprüngliches Aussehen und ihren Figurentyp für alle anderen Zwecke)."},
+  {name:"Fluch", icon:"☠️", rarity:"rare", short:"Eine gegnerische Figur zieht nur noch wie ein Bauer.", long:"Wähle eine gegnerische Figur außer dem König. Für die nächsten 2 gegnerischen Züge darf sie sich nur noch wie ein Bauer ihrer Farbe bewegen (inklusive Schlagrichtung diagonal, kein Doppelschritt)."},
+  {name:"Bauernumwandlung Plus", icon:"👑", rarity:"common", short:"Ein Bauer auf der vorletzten Reihe wandelt sich sofort um.", long:"Wähle einen eigenen Bauern, der auf der vorletzten Reihe (aus seiner Sicht) steht. Er wandelt sich sofort in eine Figur deiner Wahl um (außer König), ohne dass dafür ein Zug nötig ist."},
+  {name:"Doppelte Deckung", icon:"🎴", rarity:"common", short:"Ziehe sofort 2 zusätzliche Karten.", long:"Ziehe sofort 2 weitere Karten vom Stapel. Diese Karte selbst kostet keinen Zug und kann zusätzlich zu einem normalen Zug in derselben Runde gespielt werden."},
+  {name:"Kartendiebstahl", icon:"🔍", rarity:"rare", short:"Sieh die Hand des Gegners, nimm eine Karte.", long:"Der Gegner zeigt dir offen alle seine aktuellen Handkarten. Du wählst eine davon aus und nimmst sie in deine eigene Hand auf."},
+  {name:"Sabotage", icon:"💥", rarity:"common", short:"Der Gegner verliert zufällig eine Handkarte.", long:"Der Gegner wählt zufällig (z. B. verdeckt mischen) eine seiner aktuellen Handkarten aus und legt sie ab, ohne sie zu benutzen."},
+  {name:"Zeitgewinn", icon:"⏱️", rarity:"rare", short:"Ein zusätzlicher eigener Zug direkt im Anschluss.", long:"Nachdem du deinen aktuellen Zug beendet hast, führst du sofort einen weiteren regulären eigenen Zug aus, bevor der Gegner am Zug ist."},
+  {name:"Rochaden-Boost", icon:"🏰", rarity:"rare", short:"Rochade auch nach vorherigem Zug von König/Turm.", long:"Führe eine Rochade aus, selbst wenn König oder der beteiligte Turm im Spielverlauf bereits gezogen haben. Die üblichen Bedingungen gelten weiterhin: die Felder zwischen König und Turm müssen frei sein, und der König darf nicht im Schach stehen, durch Schach ziehen oder im Schach landen."},
+  {name:"Erdbeben", icon:"🌍", rarity:"common", short:"Alle Bauern rücken ein Feld vor.", long:"Jeder eigene Bauer, der ein freies Feld direkt vor sich hat, rückt um genau ein Feld vor. Bauern ohne freies Feld davor bleiben stehen. Es kann dabei nicht geschlagen werden."},
+  {name:"Sturmwind", icon:"🌪️", rarity:"rare", short:"Eine ganze Reihe oder Spalte verschiebt sich.", long:"Wähle eine Reihe oder Spalte sowie eine Richtung. Alle Figuren auf dieser Linie verschieben sich um 1 Feld in die gewählte Richtung. Würde eine Figur dadurch vom Brett geschoben werden oder landet sie auf einem bereits durch eine andere verschobene Figur belegten Feld, bleibt sie stattdessen auf ihrem ursprünglichen Feld stehen."},
+  {name:"Frontverschiebung", icon:"⚔️", rarity:"common", short:"Deine vorderste Reihe rückt komplett vor.", long:"Alle Figuren deiner vordersten besetzten Reihe (aus deiner Sicht) rücken, sofern das jeweilige Feld davor frei ist, gemeinsam ein Feld vor. Figuren ohne freies Zielfeld bleiben stehen."},
+  {name:"Inselbildung", icon:"🏝️", rarity:"rare", short:"Zwei Bauern sind kurzzeitig unschlagbar.", long:"Wähle zwei eigene Bauern. Für die Dauer von 3 gegnerischen Zügen können diese beiden Bauern nicht geschlagen werden."},
+  {name:"Würfelglück", icon:"🎲", rarity:"common", short:"50/50 Chance, eine gegnerische Figur zu entfernen.", long:"Wähle eine beliebige gegnerische Figur außer dem König. Wirf eine Münze oder entscheidet zufällig 50/50: bei Erfolg wird die Figur entfernt, bei Misserfolg passiert nichts und die Karte ist verbraucht."},
+  {name:"Chaostausch", icon:"🎭", rarity:"common", short:"Zwei zufällige Figuren tauschen die Plätze.", long:"Bestimmt zufällig (z. B. durch Abzählen oder Los) zwei beliebige Figuren auf dem Brett, unabhängig von Farbe oder Typ. Diese beiden tauschen sofort ihre Position, ohne dass geschlagen wird."},
+  {name:"Kartenchaos", icon:"🔀", rarity:"common", short:"Beide Spieler ziehen und legen Karten ab.", long:"Beide Spieler ziehen gleichzeitig 2 neue Karten vom Stapel und legen danach jeweils 1 davon (eigene Wahl) wieder verdeckt ab."},
+  {name:"Zeitschleife", icon:"🕰️", rarity:"epic", short:"Der letzte Zug beider Spieler wird zurückgenommen.", long:"Der zuletzt ausgeführte Zug beider Spieler wird vollständig zurückgenommen. Die Brettstellung von davor gilt wieder als aktuell. Geschlagene Figuren aus diesen Zügen kehren zurück, gezogene Karten bleiben jedoch in der Hand."},
+  {name:"Königsschild", icon:"👑", rarity:"epic", short:"Dein König kann kurzzeitig nicht mattgesetzt werden.", long:"Für die unmittelbar folgende gegnerische Zugphase kann dein König nicht mattgesetzt werden — ein Schachgebot bleibt weiterhin möglich, aber es darf nicht zum Matt führen. Der Effekt endet nach diesem einen gegnerischen Zug."},
+  {name:"Opferzug", icon:"⚖️", rarity:"epic", short:"Eigene Figur entfernen, dafür gegnerische entfernen.", long:"Wähle eine eigene Figur außer dem König und entferne sie vom Brett. Entferne im Gegenzug eine beliebige gegnerische Figur außer dem König."},
+  {name:"Doppelgänger", icon:"👯", rarity:"epic", short:"Erschaffe eine Kopie deiner Dame.", long:"Einmalig pro Spiel: Erschaffe eine exakte Kopie deiner Dame auf einem freien, direkt angrenzenden Feld. Ist deine Dame bereits geschlagen oder kein Nachbarfeld frei, verfällt die Karte wirkungslos."},
+  {name:"Großer Sieg", icon:"🏆", rarity:"epic", short:"Zwei Bauern wandeln sich gleichzeitig um.", long:"Wähle zwei eigene Bauern, die beide auf der vorletzten Reihe (aus ihrer Sicht) stehen. Beide wandeln sich sofort und gleichzeitig in Figuren deiner Wahl um (außer König), ohne dass dafür ein Zug nötig ist."},
+  {name:"Zeitraffer", icon:"⚡", rarity:"rare", short:"2 Extrazüge — aber der Gegner bekommt sie auch.", long:"Du führst sofort 2 zusätzliche eigene Züge hintereinander aus. Direkt danach darf dein Gegner ebenfalls 2 zusätzliche Züge hintereinander ausführen, bevor das Spiel normal weitergeht."},
+  {name:"Loyalität", icon:"🕊️", rarity:"rare", short:"Eine geschlagene Figur kehrt zurück — ein Bauer geht dafür.", long:"Wähle eine beliebige deiner geschlagenen Figuren. Stelle sie auf ein freies Feld in deiner Bretthälfte zurück. Entferne danach einen zufällig bestimmten eigenen Bauern vom Brett (hast du keinen Bauern mehr, entfällt dieser Preis)."},
+  {name:"Nachtwache", icon:"🌙", rarity:"common", short:"Eine Figur ist vor Bauern sicher.", long:"Wähle eine eigene Figur. Sie kann im nächsten gegnerischen Zug nicht durch einen gegnerischen Bauern geschlagen werden (andere Figuren können sie weiterhin regulär schlagen)."}
+];
+
+const RARITY_WEIGHT = { common: 8, rare: 3, epic: 1 };
+
+/* =====================================================
+   STATE
+===================================================== */
+let hand = [];
+let currentPair = null; // [cardObj, cardObj]
+let turnCount = 0;
+let currentTurnNumber = null;
+let activePlayerKey = null; // 'p1' or 'p2' for the pair currently on the table
+let turnLog = []; // { turn, player, type:'card'|'skip', cardName, rarity }
+
+const PLAYER_STORAGE_KEY = 'kartenschach_players';
+let players = { p1: 'Spieler 1', p2: 'Spieler 2' };
+try{
+  const saved = JSON.parse(localStorage.getItem(PLAYER_STORAGE_KEY));
+  if(saved && saved.p1 && saved.p2){ players = saved; }
+}catch(e){ /* ignore corrupt storage */ }
+
+function savePlayers(){
+  try{ localStorage.setItem(PLAYER_STORAGE_KEY, JSON.stringify(players)); }catch(e){ /* storage unavailable */ }
+}
+
+const SETTINGS_STORAGE_KEY = 'kartenschach_settings';
+let settings = { sound:true, vibration:true, banned:[] };
+try{
+  const savedSettings = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY));
+  if(savedSettings){ settings = { sound:true, vibration:true, banned:[], ...savedSettings }; }
+}catch(e){ /* ignore corrupt storage */ }
+
+function saveSettings(){
+  try{ localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings)); }catch(e){ /* storage unavailable */ }
+}
+
+const duelEl = document.getElementById('duel');
+const drawBtn = document.getElementById('drawBtn');
+const drawHint = document.getElementById('drawHint');
+const handArea = document.getElementById('handArea');
+const handCount = document.getElementById('handCount');
+const skipZone = document.getElementById('skipZone');
+const skipBtn = document.getElementById('skipBtn');
+const turnBanner = document.getElementById('turnBanner');
+const turnBannerName = document.getElementById('turnBannerName');
+const badgeP1 = document.getElementById('badge-p1');
+const badgeP2 = document.getElementById('badge-p2');
+const nameP1 = document.getElementById('name-p1');
+const nameP2 = document.getElementById('name-p2');
+const logTableBody = document.getElementById('logTableBody');
+const logEmpty = document.getElementById('logEmpty');
+const statsGrid = document.getElementById('statsGrid');
+const toast = document.getElementById('toast');
+
+const compendiumBtn = document.getElementById('compendiumBtn');
+const compendiumModal = document.getElementById('compendiumModal');
+const compendiumClose = document.getElementById('compendiumClose');
+const compendiumSearch = document.getElementById('compendiumSearch');
+const compendiumList = document.getElementById('compendiumList');
+
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsModal = document.getElementById('settingsModal');
+const settingsClose = document.getElementById('settingsClose');
+const soundToggle = document.getElementById('soundToggle');
+const vibrationToggle = document.getElementById('vibrationToggle');
+const banList = document.getElementById('banList');
+const banCount = document.getElementById('banCount');
+const resetBtn = document.getElementById('resetBtn');
+const copyLogBtn = document.getElementById('copyLogBtn');
+
+function renderPlayerNames(){
+  nameP1.textContent = players.p1;
+  nameP2.textContent = players.p2;
+}
+
+function editPlayer(key){
+  const nameEl = key === 'p1' ? nameP1 : nameP2;
+  const current = players[key];
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'player-name-input';
+  input.value = current;
+  input.maxLength = 24;
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  function commit(){
+    const val = input.value.trim() || current;
+    players[key] = val;
+    savePlayers();
+    input.replaceWith(nameEl);
+    nameEl.textContent = val;
+    if(currentPair) updateTurnBanner();
+  }
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ input.blur(); }
+    if(e.key === 'Escape'){ input.value = current; input.blur(); }
+  });
+}
+
+function updateActiveBadge(){
+  badgeP1.classList.toggle('active', activePlayerKey === 'p1');
+  badgeP2.classList.toggle('active', activePlayerKey === 'p2');
+}
+
+function updateTurnBanner(){
+  if(activePlayerKey){
+    turnBannerName.textContent = players[activePlayerKey];
+    turnBanner.classList.add('visible');
+  } else {
+    turnBanner.classList.remove('visible');
+  }
+  updateActiveBadge();
+}
+
+/* =====================================================
+   WEIGHTED DRAW
+===================================================== */
+function weightedPickIndex(pool){
+  const total = pool.reduce((sum, c) => sum + RARITY_WEIGHT[c.rarity], 0);
+  let r = Math.random() * total;
+  for(let i = 0; i < pool.length; i++){
+    r -= RARITY_WEIGHT[pool[i].rarity];
+    if(r <= 0) return i;
+  }
+  return pool.length - 1;
+}
+
+function drawTwoCards(){
+  const pool = CARDS.filter(c => !settings.banned.includes(c.name));
+  if(pool.length < 2){
+    return null; // not enough active cards to draw a pair
+  }
+  const i1 = weightedPickIndex(pool);
+  const first = pool.splice(i1, 1)[0];
+  const i2 = weightedPickIndex(pool);
+  const second = pool.splice(i2, 1)[0];
+  return [first, second];
+}
+
+/* =====================================================
+   RENDER
+===================================================== */
+function rarityLabel(r){
+  return { common:"Häufig", rare:"Selten", epic:"Episch" }[r];
+}
+
+function renderDuel(){
+  duelEl.innerHTML = '';
+  if(!currentPair){
+    duelEl.innerHTML = `<div class="empty-state"><span>♟</span>Noch keine Karten gezogen — drück oben auf den Knopf.</div>`;
+    skipZone.style.display = 'none';
+    activePlayerKey = null;
+    updateTurnBanner();
+    return;
+  }
+  skipZone.style.display = 'flex';
+  currentPair.forEach((card, idx) => {
+    const slot = document.createElement('div');
+    slot.className = 'card-slot';
+    slot.dataset.idx = idx;
+    slot.innerHTML = cardMarkup(card, idx);
+    duelEl.appendChild(slot);
+  });
+}
+
+function cardMarkup(card, idx){
+  const letter = card.name.charAt(0).toUpperCase();
+  return `
+    <div class="card" id="card-${idx}">
+      <div class="card-inner">
+        <div class="card-face card-front">
+          <div class="card-frame"><span></span></div>
+          <div class="card-rarity ${card.rarity}"><span class="dot"></span>${rarityLabel(card.rarity)}</div>
+          <div class="card-seal"><span class="letter">${letter}</span></div>
+          <div class="card-name">${card.name}</div>
+          <div class="card-divider"></div>
+          <div class="card-short">${card.short}</div>
+          <div class="card-actions" id="actions-front-${idx}">${playActionsHtml(idx)}</div>
+        </div>
+        <div class="card-face card-back">
+          <div>
+            <div class="back-header">
+              <span class="back-title">${card.name}</span>
+              <div class="back-divider"></div>
+            </div>
+            <div class="back-rule-label">Genaue Regel</div>
+            <div class="back-text">${card.long}</div>
+          </div>
+          <div class="card-actions" id="actions-back-${idx}">${playActionsHtml(idx, true)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function playActionsHtml(idx, isBack){
+  const infoBtn = isBack
+    ? `<button class="btn-info" title="Zurückdrehen" onclick="flipCard(${idx})">↺</button>`
+    : `<button class="btn-info" title="Genaue Regel anzeigen" onclick="flipCard(${idx})">i</button>`;
+  return `<button class="btn-choose" onclick="requestPlay(${idx})">Jetzt spielen</button>${infoBtn}`;
+}
+
+function confirmActionsHtml(idx){
+  return `
+    <div class="confirm-row" style="flex:1; padding:0;">
+      <button class="btn-confirm-yes" onclick="chooseCard(${idx})">Ja, spielen</button>
+      <button class="btn-confirm-no" onclick="cancelPlay(${idx})">Abbrechen</button>
+    </div>
+  `;
+}
+
+function requestPlay(idx){
+  const front = document.getElementById(`actions-front-${idx}`);
+  const back = document.getElementById(`actions-back-${idx}`);
+  if(front) front.innerHTML = confirmActionsHtml(idx);
+  if(back) back.innerHTML = confirmActionsHtml(idx);
+}
+
+function cancelPlay(idx){
+  const front = document.getElementById(`actions-front-${idx}`);
+  const back = document.getElementById(`actions-back-${idx}`);
+  if(front) front.innerHTML = playActionsHtml(idx);
+  if(back) back.innerHTML = playActionsHtml(idx, true);
+}
+
+function flipCard(idx){
+  const el = document.getElementById(`card-${idx}`);
+  if(el) el.classList.toggle('flipped');
+  playTone('flip');
+}
+
+function chooseCard(idx){
+  const chosen = currentPair[idx];
+  const otherIdx = idx === 0 ? 1 : 0;
+  const otherSlot = duelEl.querySelector(`.card-slot[data-idx="${otherIdx}"]`);
+  if(otherSlot){
+    otherSlot.classList.add('discarding');
+  }
+  hand.push({ ...chosen, playerName: players[activePlayerKey] });
+  turnLog.push({ turn: currentTurnNumber, player: players[activePlayerKey], type:'card', cardName: chosen.name, rarity: chosen.rarity });
+  currentPair = null;
+  drawBtn.disabled = false;
+  drawHint.textContent = `„${chosen.name}" wird jetzt gespielt — führe die Regel sofort in ${players[activePlayerKey]}s Zug aus.`;
+  renderHand();
+  renderTurnLog();
+  renderStats();
+  playTone('play');
+  vibrate([40]);
+
+  setTimeout(() => { renderDuel(); }, 480);
+}
+
+function skipTurn(){
+  turnLog.push({ turn: currentTurnNumber, player: players[activePlayerKey], type:'skip' });
+  currentPair = null;
+  drawBtn.disabled = false;
+  drawHint.textContent = `${players[activePlayerKey]} zieht normal, ohne Karte einzusetzen.`;
+  renderDuel();
+  renderTurnLog();
+  renderStats();
+}
+
+function renderTurnLog(){
+  if(turnLog.length === 0){
+    logTableBody.innerHTML = '';
+    logEmpty.style.display = 'block';
+    return;
+  }
+  logEmpty.style.display = 'none';
+  const rows = turnLog.slice().reverse().map(entry => {
+    const actionHtml = entry.type === 'card'
+      ? `<span class="log-action"><span class="mini-dot ${entry.rarity}"></span>${entry.cardName}</span>`
+      : `<span class="log-skip">Normal gezogen (keine Karte)</span>`;
+    return `
+      <tr>
+        <td class="log-turn-num">${entry.turn}</td>
+        <td class="log-player">${entry.player}</td>
+        <td>${actionHtml}</td>
+      </tr>
+    `;
+  }).join('');
+  logTableBody.innerHTML = rows;
+}
+
+function renderHand(){
+  handCount.textContent = `${hand.length} Karte${hand.length === 1 ? '' : 'n'}`;
+  if(hand.length === 0){
+    handArea.innerHTML = `<div class="hand-empty">Noch keine Karte gewählt.</div>`;
+    return;
+  }
+  const grid = document.createElement('div');
+  grid.className = 'hand-grid';
+  hand.forEach((card, i) => {
+    const d = document.createElement('details');
+    d.className = 'hand-card';
+    const letter = card.name.charAt(0).toUpperCase();
+    d.innerHTML = `
+      <summary>
+        <span class="hand-icon">${letter}</span>
+        <span class="hand-summary-text">
+          <div class="hand-name"><span class="mini-dot ${card.rarity}"></span>${card.name} <span style="color:#8f8471; font-weight:400; font-size:0.8rem;">— ${card.playerName}</span></div>
+          <div class="hand-short">${card.short}</div>
+        </span>
+        <span class="hand-caret">▸</span>
+      </summary>
+      <div class="hand-detail">
+        ${card.long}
+        <div><button class="discard-btn" onclick="discardFromHand(${i})">Aus Verlauf entfernen</button></div>
+      </div>
+    `;
+    grid.appendChild(d);
+  });
+  handArea.innerHTML = '';
+  handArea.appendChild(grid);
+}
+
+function discardFromHand(i){
+  hand.splice(i, 1);
+  renderHand();
+}
+
+/* =====================================================
+   SOUND & VIBRATION
+===================================================== */
+let audioCtx = null;
+function ensureAudioCtx(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e){ audioCtx = null; }
+  }
+  return audioCtx;
+}
+
+function playTone(kind){
+  if(!settings.sound) return;
+  const ctx = ensureAudioCtx();
+  if(!ctx) return;
+  if(ctx.state === 'suspended'){ ctx.resume(); }
+
+  const presets = {
+    draw:   { freq: 440, freq2: 660, duration: 0.18, gain: 0.05 },
+    flip:   { freq: 520, freq2: null, duration: 0.07, gain: 0.03 },
+    play:   { freq: 660, freq2: 880, duration: 0.22, gain: 0.06 },
+    skip:   { freq: 300, freq2: 220, duration: 0.16, gain: 0.04 }
+  };
+  const p = presets[kind] || presets.flip;
+  const now = ctx.currentTime;
+
+  const osc = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(p.freq, now);
+  if(p.freq2){ osc.frequency.linearRampToValueAtTime(p.freq2, now + p.duration); }
+  gainNode.gain.setValueAtTime(p.gain, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + p.duration);
+  osc.connect(gainNode);
+  gainNode.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + p.duration + 0.02);
+}
+
+function vibrate(pattern){
+  if(!settings.vibration) return;
+  if(navigator.vibrate){
+    try{ navigator.vibrate(pattern); }catch(e){ /* ignore */ }
+  }
+}
+
+/* =====================================================
+   TOAST
+===================================================== */
+let toastTimer = null;
+function showToast(msg){
+  toast.textContent = msg;
+  toast.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.classList.remove('visible'); }, 2400);
+}
+
+/* =====================================================
+   KOMPENDIUM
+===================================================== */
+function renderCompendium(filter){
+  const term = (filter || '').trim().toLowerCase();
+  const sorted = CARDS.slice().sort((a,b) => a.name.localeCompare(b.name, 'de'));
+  const matches = sorted.filter(c => !term || c.name.toLowerCase().includes(term) || c.short.toLowerCase().includes(term));
+
+  if(matches.length === 0){
+    compendiumList.innerHTML = `<div class="compendium-empty">Keine Karte gefunden.</div>`;
+    return;
+  }
+
+  compendiumList.innerHTML = matches.map(card => {
+    const letter = card.name.charAt(0).toUpperCase();
+    const banned = settings.banned.includes(card.name);
+    return `
+      <details class="hand-card">
+        <summary>
+          <span class="hand-icon">${letter}</span>
+          <span class="hand-summary-text">
+            <div class="hand-name">
+              <span class="mini-dot ${card.rarity}"></span>${card.name}
+              ${banned ? '<span style="color:#8f8471; font-weight:400; font-size:0.78rem;"> — gebannt</span>' : ''}
+            </div>
+            <div class="hand-short">${card.short}</div>
+          </span>
+          <span class="hand-caret">▸</span>
+        </summary>
+        <div class="hand-detail">${card.long}</div>
+      </details>
+    `;
+  }).join('');
+}
+
+function openCompendium(){
+  renderCompendium(compendiumSearch.value);
+  compendiumModal.classList.add('open');
+}
+function closeCompendium(){
+  compendiumModal.classList.remove('open');
+}
+
+compendiumBtn.addEventListener('click', openCompendium);
+compendiumClose.addEventListener('click', closeCompendium);
+compendiumModal.addEventListener('click', (e) => { if(e.target === compendiumModal) closeCompendium(); });
+compendiumSearch.addEventListener('input', () => renderCompendium(compendiumSearch.value));
+
+/* =====================================================
+   EINSTELLUNGEN (Sound / Vibration / Bann-Liste / Reset)
+===================================================== */
+function renderBanList(){
+  const sorted = CARDS.slice().sort((a,b) => a.name.localeCompare(b.name, 'de'));
+  banList.innerHTML = sorted.map(card => {
+    const checked = !settings.banned.includes(card.name) ? 'checked' : '';
+    const safeId = 'ban-' + card.name.replace(/[^a-zA-Z0-9]/g, '');
+    return `
+      <div class="ban-row">
+        <input type="checkbox" id="${safeId}" ${checked} onchange="toggleBan('${card.name.replace(/'/g, "\\'")}', this.checked)">
+        <label for="${safeId}"><span class="mini-dot ${card.rarity}"></span> ${card.name}</label>
+      </div>
+    `;
+  }).join('');
+  updateBanCount();
+}
+
+function updateBanCount(){
+  const active = CARDS.length - settings.banned.length;
+  banCount.textContent = `${active} von ${CARDS.length} Karten aktiv`;
+}
+
+function toggleBan(name, isActive){
+  if(isActive){
+    settings.banned = settings.banned.filter(n => n !== name);
+  } else {
+    if(!settings.banned.includes(name)) settings.banned.push(name);
+  }
+  saveSettings();
+  updateBanCount();
+}
+
+function openSettings(){
+  soundToggle.checked = settings.sound;
+  vibrationToggle.checked = settings.vibration;
+  renderBanList();
+  settingsModal.classList.add('open');
+}
+function closeSettings(){
+  settingsModal.classList.remove('open');
+}
+
+settingsBtn.addEventListener('click', openSettings);
+settingsClose.addEventListener('click', closeSettings);
+settingsModal.addEventListener('click', (e) => { if(e.target === settingsModal) closeSettings(); });
+
+soundToggle.addEventListener('change', () => {
+  settings.sound = soundToggle.checked;
+  saveSettings();
+  if(settings.sound){ ensureAudioCtx(); playTone('flip'); }
+});
+vibrationToggle.addEventListener('change', () => {
+  settings.vibration = vibrationToggle.checked;
+  saveSettings();
+  if(settings.vibration) vibrate([30]);
+});
+
+resetBtn.addEventListener('click', () => {
+  const sure = confirm('Neues Spiel starten? Der komplette Zug-Verlauf und alle gespielten Karten werden gelöscht. Spielernamen und Einstellungen bleiben erhalten.');
+  if(!sure) return;
+  hand = [];
+  turnLog = [];
+  turnCount = 0;
+  currentTurnNumber = null;
+  currentPair = null;
+  activePlayerKey = null;
+  drawBtn.disabled = false;
+  drawHint.textContent = 'Ziehe zwei Karten und wähle eine für deine Hand.';
+  renderDuel();
+  renderHand();
+  renderTurnLog();
+  renderStats();
+  closeSettings();
+  showToast('Neues Spiel gestartet.');
+});
+
+/* =====================================================
+   STATISTIK
+===================================================== */
+function renderStats(){
+  const rarities = ['common','rare','epic'];
+  const colors = { common:'var(--common)', rare:'var(--rare)', epic:'var(--epic-bright)' };
+  const labels = { common:'Häufig', rare:'Selten', epic:'Episch' };
+
+  const counts = {
+    p1: { common:0, rare:0, epic:0 },
+    p2: { common:0, rare:0, epic:0 }
+  };
+  turnLog.forEach(entry => {
+    if(entry.type !== 'card') return;
+    const key = entry.player === players.p1 ? 'p1' : (entry.player === players.p2 ? 'p2' : null);
+    if(key) counts[key][entry.rarity]++;
+  });
+
+  const maxCount = Math.max(1, ...['p1','p2'].flatMap(k => rarities.map(r => counts[k][r])));
+
+  const blockFor = (key) => {
+    const rows = rarities.map(r => {
+      const val = counts[key][r];
+      const pct = Math.round((val / maxCount) * 100);
+      return `
+        <div class="stats-row">
+          <span class="stats-label">${labels[r]}</span>
+          <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${pct}%; background:${colors[r]};"></div></div>
+          <span class="stats-num">${val}</span>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="stats-card">
+        <div class="stats-name">${players[key]}</div>
+        ${rows}
+      </div>
+    `;
+  };
+
+  statsGrid.innerHTML = blockFor('p1') + blockFor('p2');
+}
+
+/* =====================================================
+   VERLAUF KOPIEREN
+===================================================== */
+function copyLogToClipboard(){
+  if(turnLog.length === 0){
+    showToast('Noch nichts zum Kopieren.');
+    return;
+  }
+  const lines = turnLog.map(entry => {
+    const action = entry.type === 'card'
+      ? `${entry.cardName} (${{common:'Häufig',rare:'Selten',epic:'Episch'}[entry.rarity]})`
+      : 'Normal gezogen (keine Karte)';
+    return `Zug ${entry.turn} — ${entry.player}: ${action}`;
+  });
+  const text = `Kartenschach — Zug-Verlauf\n\n${lines.join('\n')}`;
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(
+      () => showToast('Verlauf in die Zwischenablage kopiert.'),
+      () => fallbackCopy(text)
+    );
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{
+    document.execCommand('copy');
+    showToast('Verlauf in die Zwischenablage kopiert.');
+  }catch(e){
+    showToast('Kopieren nicht möglich in diesem Browser.');
+  }
+  document.body.removeChild(ta);
+}
+
+copyLogBtn.addEventListener('click', copyLogToClipboard);
+
+/* =====================================================
+   DRAW HANDLER
+===================================================== */
+drawBtn.addEventListener('click', () => {
+  activePlayerKey = (turnCount % 2 === 0) ? 'p1' : 'p2';
+  const pair = drawTwoCards();
+
+  if(!pair){
+    showToast('Zu wenige aktive Karten — prüf deine Bann-Liste in den Einstellungen.');
+    return;
+  }
+
+  turnCount++;
+  currentTurnNumber = turnCount;
+  currentPair = pair;
+  drawBtn.disabled = true;
+  drawHint.textContent = `${players[activePlayerKey]} wählt eine Karte zum sofortigen Spielen — oder zieht normal, falls keine passt.`;
+  updateTurnBanner();
+  renderDuel();
+  playTone('draw');
+  vibrate([25, 40, 25]);
+});
+
+skipBtn.addEventListener('click', () => {
+  skipTurn();
+  playTone('skip');
+  vibrate([20]);
+});
+
+renderPlayerNames();
+renderDuel();
+renderHand();
+renderTurnLog();
+renderStats();
+
+if('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* hosting without SW support — ignore */ });
+  });
+}
+</script>
+</body>
+</html>
